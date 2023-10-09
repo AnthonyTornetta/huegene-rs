@@ -16,8 +16,17 @@ fn has_coordinates(coords: (u16, u16), points: &[((u16, u16), Color)]) -> bool {
     points.iter().any(|x| x.0 == coords)
 }
 
-fn run(w: &mut Stdout) -> std::io::Result<()> {
+fn run(stdout: &mut Stdout) -> std::io::Result<()> {
+    /// Bigger = more randomness to the colors.
     const RANDOM_FACTOR: u8 = 19;
+    /// # of maximum starting points randomly chosen
+    const MAX_STARTING_POINTS: usize = 3;
+    /// Amount paused after each pixel placement
+    const PER_PIXEL_DURATION: Duration = time::Duration::from_millis(1);
+    /// Amount paused after completing a picture
+    const PAUSE_DURATION: Duration = Duration::from_secs(5);
+    /// Press this key to exit the program
+    const QUIT_KEY: char = 'q';
 
     terminal::enable_raw_mode()?;
 
@@ -25,7 +34,7 @@ fn run(w: &mut Stdout) -> std::io::Result<()> {
         let (width, height) = terminal::size()?;
 
         queue!(
-            w,
+            stdout,
             style::ResetColor,
             terminal::Clear(ClearType::All),
             cursor::Hide,
@@ -35,7 +44,7 @@ fn run(w: &mut Stdout) -> std::io::Result<()> {
         let mut already_did = vec![];
         let mut todo = vec![];
 
-        let n_starting_points = rand::random::<usize>() % 4 + 1;
+        let n_starting_points = rand::random::<usize>() % MAX_STARTING_POINTS + 1;
 
         for _ in 0..n_starting_points {
             let starting_color = Color::Rgb {
@@ -61,7 +70,7 @@ fn run(w: &mut Stdout) -> std::io::Result<()> {
 
             if event::poll(Duration::from_secs(0))? {
                 if let Ok(Event::Key(KeyEvent {
-                    code: KeyCode::Char('q'),
+                    code: KeyCode::Char(QUIT_KEY),
                     kind: KeyEventKind::Press,
                     modifiers: _,
                     state: _,
@@ -108,7 +117,7 @@ fn run(w: &mut Stdout) -> std::io::Result<()> {
                         let b_change = b_change as i32 - RANDOM_FACTOR as i32 / 2;
 
                         let Color::Rgb { r, g, b } = color else {
-                            panic!("Non rgb-color present");
+                            unreachable!("Non-rgb color present");
                         };
 
                         let (r, g, b) = (
@@ -129,7 +138,7 @@ fn run(w: &mut Stdout) -> std::io::Result<()> {
             }
 
             queue!(
-                w,
+                stdout,
                 cursor::MoveTo(x, y),
                 style::PrintStyledContent(StyledContent::new(
                     ContentStyle {
@@ -140,12 +149,12 @@ fn run(w: &mut Stdout) -> std::io::Result<()> {
                 ))
             )?;
 
-            w.flush()?;
+            stdout.flush()?;
 
-            thread::sleep(time::Duration::from_millis(1));
+            thread::sleep(PER_PIXEL_DURATION);
         }
 
-        thread::sleep(time::Duration::from_secs(5));
+        thread::sleep(PAUSE_DURATION);
     }
 }
 
