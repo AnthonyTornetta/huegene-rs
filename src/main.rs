@@ -106,12 +106,14 @@ fn run(stdout: &mut Stdout) -> std::io::Result<()> {
                     let coords = (x, y);
 
                     if !has_coordinates(coords, &already_did) && !has_coordinates(coords, &todo) {
-                        // 0-4
+                        // Ranges assume RANDOM_FACTOR is 19
+
+                        // [0, 18]
                         let r_change = rand::random::<u8>() % RANDOM_FACTOR;
                         let g_change = rand::random::<u8>() % RANDOM_FACTOR;
                         let b_change = rand::random::<u8>() % RANDOM_FACTOR;
 
-                        // -2 -> 2
+                        // [-9, 9]
                         let r_change = r_change as i32 - RANDOM_FACTOR as i32 / 2;
                         let g_change = g_change as i32 - RANDOM_FACTOR as i32 / 2;
                         let b_change = b_change as i32 - RANDOM_FACTOR as i32 / 2;
