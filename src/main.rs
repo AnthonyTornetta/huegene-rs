@@ -1,10 +1,13 @@
 use std::{
     io::{self, Stdout, Write},
-    thread, time,
+    thread,
+    time::{self, Duration},
 };
 
 use crossterm::{
-    cursor, execute, queue,
+    cursor,
+    event::{self, Event, KeyCode, KeyEvent, KeyEventKind},
+    execute, queue,
     style::{self, Color, ContentStyle, StyledContent},
     terminal::{self, ClearType},
 };
@@ -18,43 +21,55 @@ fn run(w: &mut Stdout) -> std::io::Result<()> {
 
     terminal::enable_raw_mode()?;
 
-    let (width, height) = terminal::size()?;
+    loop {
+        let (width, height) = terminal::size()?;
 
-    queue!(
-        w,
-        style::ResetColor,
-        terminal::Clear(ClearType::All),
-        cursor::Hide,
-        cursor::MoveTo(0, 0)
-    )?;
+        queue!(
+            w,
+            style::ResetColor,
+            terminal::Clear(ClearType::All),
+            cursor::Hide,
+            cursor::MoveTo(0, 0)
+        )?;
 
-    let mut already_did = vec![];
-    let mut todo = vec![];
-    let mut new_todo = vec![];
+        let mut already_did = vec![];
+        let mut todo = vec![];
 
-    let n_starting_points = rand::random::<usize>() % 4 + 1;
+        let n_starting_points = rand::random::<usize>() % 4 + 1;
 
-    for _ in 0..n_starting_points {
-        let starting_color = Color::Rgb {
-            r: rand::random::<u8>(),
-            g: rand::random::<u8>(),
-            b: rand::random::<u8>(),
-        };
+        for _ in 0..n_starting_points {
+            let starting_color = Color::Rgb {
+                r: rand::random::<u8>(),
+                g: rand::random::<u8>(),
+                b: rand::random::<u8>(),
+            };
 
-        let starting_coords = (
-            rand::random::<u16>() % width,
-            rand::random::<u16>() % height,
-        );
+            let starting_coords = (
+                rand::random::<u16>() % width,
+                rand::random::<u16>() % height,
+            );
 
-        todo.push((starting_coords, starting_color));
-    }
+            todo.push((starting_coords, starting_color));
+        }
 
-    while !todo.is_empty() {
-        let mut indicies = (0..todo.len()).into_iter().collect::<Vec<usize>>();
-        while !indicies.is_empty() {
-            let index = indicies.swap_remove(rand::random::<usize>() % indicies.len());
+        while !todo.is_empty() {
+            let index = rand::random::<usize>() % todo.len();
 
-            let ((x, y), color) = todo[index];
+            let ((x, y), color) = todo.swap_remove(index);
+
+            already_did.push(((x, y), color));
+
+            if event::poll(Duration::from_secs(0))? {
+                if let Ok(Event::Key(KeyEvent {
+                    code: KeyCode::Char('q'),
+                    kind: KeyEventKind::Press,
+                    modifiers: _,
+                    state: _,
+                })) = event::read()
+                {
+                    return Ok(());
+                }
+            }
 
             for dy in -1..=1 {
                 for dx in -1..=1 {
@@ -81,10 +96,7 @@ fn run(w: &mut Stdout) -> std::io::Result<()> {
 
                     let coords = (x, y);
 
-                    if !has_coordinates(coords, &already_did)
-                        && !has_coordinates(coords, &new_todo)
-                        && !has_coordinates(coords, &todo)
-                    {
+                    if !has_coordinates(coords, &already_did) && !has_coordinates(coords, &todo) {
                         // 0-4
                         let r_change = rand::random::<u8>() % RANDOM_FACTOR;
                         let g_change = rand::random::<u8>() % RANDOM_FACTOR;
@@ -111,7 +123,7 @@ fn run(w: &mut Stdout) -> std::io::Result<()> {
                             b.max(0).min(u8::MAX as i32) as u8,
                         );
 
-                        new_todo.push((coords, Color::Rgb { r, g, b }));
+                        todo.push((coords, Color::Rgb { r, g, b }));
                     }
                 }
             }
@@ -129,26 +141,25 @@ fn run(w: &mut Stdout) -> std::io::Result<()> {
             )?;
 
             w.flush()?;
+
+            thread::sleep(time::Duration::from_millis(1));
         }
 
-        thread::sleep(time::Duration::from_millis(100));
-
-        already_did = todo;
-        todo = new_todo;
-        new_todo = vec![];
+        thread::sleep(time::Duration::from_secs(5));
     }
+}
+
+fn main() -> std::io::Result<()> {
+    let mut stdout = io::stdout();
+
+    run(&mut stdout)?;
 
     execute!(
-        w,
+        stdout,
         style::ResetColor,
         cursor::Show,
         terminal::LeaveAlternateScreen
     )?;
 
     terminal::disable_raw_mode()
-}
-
-fn main() -> std::io::Result<()> {
-    let mut stdout = io::stdout();
-    run(&mut stdout)
 }
